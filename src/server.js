@@ -34,7 +34,9 @@ app.use(
   cors({
     origin: [
       'http://127.0.0.1:5501',    // Agregar el origen que usas en el frontend
-      'http://localhost:5173',    // Agregar otros orígenes que necesites
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://examen-back-v1.vercel.app',// Agregar otros orígenes que necesites
       process.env.URL_FRONTEND || "*"  // Puedes mantener la variable de entorno si deseas flexibilidad
     ],
     methods: ["GET", "POST", "PUT", "DELETE"], // Métodos permitidos
