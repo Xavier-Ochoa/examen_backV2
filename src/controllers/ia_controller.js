@@ -1,20 +1,21 @@
 import fetch from 'node-fetch';
 
 // ============================================================
-// CONFIGURACIÓN DEL MODELO DE IA (Hugging Face Router)
+// CONFIGURACIÓN HUGGING FACE
 // ============================================================
 const HF_API_URL = 'https://router.huggingface.co/v1/chat/completions';
 
 // ============================================================
-// POST /api/ia/generar-titulo
+// POST /api/ia/generar-imagen-proyecto
 // Body: { descripcion: string }
-// Retorna: { success, data: { titulos, ejemplo, modelo } }
+// Retorna: { success, data: { titulos, modelo } }
+// (NOTA: aunque el nombre diga "imagen", SOLO genera TÍTULOS)
 // ============================================================
 export const generarImagenProyecto = async (req, res) => {
   try {
     const { descripcion } = req.body;
 
-    // Validación de entrada
+    // ---------------- VALIDACIÓN ----------------
     if (!descripcion || descripcion.trim().length < 15) {
       return res.status(400).json({
         success: false,
@@ -24,28 +25,32 @@ export const generarImagenProyecto = async (req, res) => {
 
     const hfToken = process.env.HF_API_TOKEN;
     if (!hfToken) {
-      console.error('❌ HF_API_TOKEN no definido en .env');
+      console.error('❌ HF_API_TOKEN no definido');
       return res.status(500).json({
         success: false,
         message: 'Servicio de IA no configurado'
       });
     }
 
-    // Construir prompt para la IA
+    // ---------------- PROMPT ----------------
     const prompt = `
-Eres un asistente experto en desarrollo web.
-Lee esta descripción de un proyecto:
+Devuelve EXCLUSIVAMENTE un JSON válido.
+NO escribas texto adicional.
+NO expliques nada.
+NO incluyas código.
+
+Formato obligatorio:
+{
+  "titulos": ["", "", ""]
+}
+
+Lee la siguiente descripción de un proyecto de programación
+y genera 3 títulos claros, profesionales y coherentes:
 
 "${descripcion}"
-
-Genera un JSON que contenga:
-- "titulos": un arreglo con 3 posibles títulos para este proyecto web.
-- "ejemplo": un texto que explique brevemente qué hace el proyecto.
-
-Devuelve SOLO el JSON, nada más.
 `;
 
-    // Llamada al router de Hugging Face
+    // ---------------- LLAMADA A IA ----------------
     const response = await fetch(HF_API_URL, {
       method: 'POST',
       headers: {
@@ -53,10 +58,10 @@ Devuelve SOLO el JSON, nada más.
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'meta-llama/Llama-3.2-1B-Instruct',
+        model: 'meta-llama/Llama-3.1-8B-Instruct',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 250
+        temperature: 0.6,
+        max_tokens: 150
       })
     });
 
@@ -72,37 +77,31 @@ Devuelve SOLO el JSON, nada más.
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || '';
 
-    // Intentar limpiar y extraer JSON válido
+    // ---------------- EXTRACCIÓN DE JSON ----------------
     let salida;
     try {
-      const inicio = text.indexOf('{');
-      const fin = text.lastIndexOf('}');
-
-      if (inicio !== -1 && fin !== -1) {
-        const posibleJson = text.substring(inicio, fin + 1);
-        salida = JSON.parse(posibleJson);
-      } else {
-        throw new Error('No se encontró JSON en la respuesta');
-      }
-    } catch (parseError) {
-      console.error('❌ No se pudo extraer JSON válido:', parseError, '\nTexto IA:', text);
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('JSON no encontrado');
+      salida = JSON.parse(match[0]);
+    } catch (err) {
+      console.error('❌ JSON inválido:', err, '\nTexto IA:', text);
       return res.status(500).json({
         success: false,
-        message: 'La IA no devolvió un JSON interpretable'
+        message: 'La IA no devolvió un JSON válido'
       });
     }
 
+    // ---------------- RESPUESTA FINAL ----------------
     res.status(200).json({
       success: true,
       data: {
-        titulos: salida.titulos || [],
-        ejemplo: salida.ejemplo || '',
-        modelo: 'meta-llama/Llama-3.2-1B-Instruct'
+        titulos: Array.isArray(salida.titulos) ? salida.titulos : [],
+        modelo: 'mistralai/Mistral-7B-Instruct-v0.2'
       }
     });
 
   } catch (error) {
-    console.error('❌ Error interno IA:', error);
+    console.error('❌ Error interno:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
