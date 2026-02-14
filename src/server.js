@@ -33,7 +33,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      'http://127.0.0.1:5501',    // Agregar el origen que usas en el frontend
+      'http://127.0.0.1:5500',    // Agregar el origen que usas en el frontend
       'http://localhost:5173',
       'http://localhost:3000',
       'https://examen-back-v1.vercel.app',// Agregar otros orígenes que necesites
